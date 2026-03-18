@@ -116,6 +116,35 @@ class JlcontentfieldsfilterHelper
                         : JPATH_ROOT . '/modules/mod_jlcontentfieldsfilter/layouts'
                     );
 
+                // --- populate from text inputs ---
+                if (\in_array($layout, ['checkboxes', 'list', 'radio']) && $field->type === 'text') {
+                    $db = \Joomla\CMS\Factory::getContainer()->get(\Joomla\Database\DatabaseInterface::class);
+                    $query = $db->getQuery(true)
+                        ->select('DISTINCT value')
+                        ->from($db->quoteName('#__fields_values'))
+                        ->where($db->quoteName('field_id') . ' = ' . (int) $field->id)
+                        ->where($db->quoteName('value') . ' != ' . $db->quote(''));
+
+                    $distinctValues = $db->setQuery($query)->loadColumn();
+
+                    if (!empty($distinctValues)) {
+                        $dynamicOptions = [];
+                        foreach ($distinctValues as $val) {
+                            $opt = new \stdClass();
+                            $opt->value = $val;
+                            $opt->name  = $val; // not shown in the label
+                            $opt->text  = $val; // text for the select
+                            $dynamicOptions[] = $opt;
+                        }
+                        // insert the options in the field
+                        $field->fieldparams->set('options', $dynamicOptions);
+                        
+                        // “Trick” the form by temporarily changing its type,
+                        // allowing the setHiddenOptions() function to process it correctly
+                        $field->type = $layout; 
+                    }
+                }
+
                 if ($field->params->get('field_hidden', false) || $field->params->get('options_hidden', false)) {
                     $field = $this->setHiddenOptions($field, $category_id, $option);
                 }
