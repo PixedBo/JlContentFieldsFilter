@@ -231,16 +231,33 @@ class Jlcontentfieldsfilter extends CMSPlugin
                 case 'text':
                     if (!empty($v)) {
                         if (\is_array($v)) {
-                            if (!empty($v['from']) && !empty($v['to'])) {
-                                // Security: Cast BOTH values to int to prevent SQL injection
-                                $where = '(field_id = ' . (int)$k . ' AND CAST(value AS SIGNED) BETWEEN ' . (int)$v['from'] . ' AND ' . (int)$v['to'] . ')';
-                            } elseif (!empty($v['from'])) {
-                                $where = '(field_id = ' . (int)$k . ' AND CAST(value AS SIGNED) >= ' . (int)$v['from'] . ')';
-                            } elseif (!empty($v['to'])) {
-                                $where = '(field_id = ' . (int)$k . ' AND CAST(value AS SIGNED) <= ' . (int)$v['to'] . ')';
+                            // Check if it's an array for the range filter (from/to)
+                            if (isset($v['from']) || isset($v['to'])) {
+                                if (!empty($v['from']) && !empty($v['to'])) {
+                                    $where = '(field_id = ' . (int)$k . ' AND CAST(value AS SIGNED) BETWEEN ' . (int)$v['from'] . ' AND ' . (int)$v['to'] . ')';
+                                } elseif (!empty($v['from'])) {
+                                    $where = '(field_id = ' . (int)$k . ' AND CAST(value AS SIGNED) >= ' . (int)$v['from'] . ')';
+                                } elseif (!empty($v['to'])) {
+                                    $where = '(field_id = ' . (int)$k . ' AND CAST(value AS SIGNED) <= ' . (int)$v['to'] . ')';
+                                }
+                            } 
+                            // If it is a standard array (checkbox/list)
+                            else {
+                                $newVal = [];
+                                foreach ($v as $val) {
+                                    if ($val !== '') {
+                                        $newVal[] = $val;
+                                    }
+                                }
+                                if (\count($newVal)) {
+                                    $quotedValues = array_map(function($val) use ($db) {
+                                        return $db->quote($val);
+                                    }, $newVal);
+                                    $where = '(field_id = ' . (int)$k . ' AND value IN(' . implode(', ', $quotedValues) . '))';
+                                }
                             }
                         } else {
-                            // Security: Escape value before using in LIKE to prevent SQL injection
+                            // Default behavior for single text input
                             $escapedValue = $db->escape($v);
                             $where = '(field_id = ' . (int)$k . ' AND value LIKE ' . $db->quote('%' . $escapedValue . '%') . ')';
                         }
